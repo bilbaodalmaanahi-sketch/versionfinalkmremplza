@@ -131,7 +131,7 @@ ingrekk = st.number_input(
 
 
 # ============================================================
-# NUEVA BÚSQUEDA INDEPENDIENTE EN METROS
+# BÚSQUEDA INDEPENDIENTE EN METROS
 # ============================================================
 
 busqueda_metros_input = st.number_input(
@@ -172,18 +172,27 @@ st.number_input(
 
 
 # ============================================================
-# UMBRALES INDEPENDIENTES
+# TRES UMBRALES INDEPENDIENTES
 # ============================================================
 
+# 1) Umbral para búsqueda/modificación de KM
 UMBRAL_KM = 100
-UMBRAL_METROS = 100_000
-UMBRAL_METROS = 100_000_000
+
+# 2) Umbral para búsqueda/modificación de METROS INDEPENDIENTES
+UMBRAL_METROS_INDEPENDIENTES = 100
+
+# 3) Umbral para búsqueda/modificación de METROS
+#    EQUIVALENTES AL KM
+UMBRAL_METROS_EQUIVALENTES = 100_000_000
+
 
 st.info(
     f"Umbral KM: modificación si distancia absoluta < "
     f"**{UMBRAL_KM:,} km** | "
-    f"Umbral metros: modificación si distancia absoluta < "
-    f"**{UMBRAL_METROS:,} m**"
+    f"Umbral metros independientes: modificación si distancia absoluta < "
+    f"**{UMBRAL_METROS_INDEPENDIENTES:,} m** | "
+    f"Umbral metros equivalentes: modificación si distancia absoluta < "
+    f"**{UMBRAL_METROS_EQUIVALENTES:,} m**"
 )
 
 
@@ -293,7 +302,8 @@ if buscar:
 
 
         # ====================================================
-        # RANGO DE LAS 3 ÚLTIMAS CIFRAS - METROS INDEPENDIENTE
+        # RANGO DE LAS 3 ÚLTIMAS CIFRAS -
+        # METROS INDEPENDIENTE
         # ====================================================
 
         rango_metros_inicio = (
@@ -322,18 +332,15 @@ if buscar:
             f"{tamaño:,} bytes"
         )
 
-
         col2.metric(
             "KM buscado",
             f"{objetivo:,}"
         )
 
-
         col3.metric(
             "Metros independientes",
             f"{objetivo_metros_independiente:,}"
         )
-
 
         col4.metric(
             "KM → metros",
@@ -390,7 +397,7 @@ if buscar:
 
 
             # =================================================
-            # BÚSQUEDA DEL RANGO DE KM
+            # 1. BÚSQUEDA DEL RANGO DE KM
             # =================================================
 
             if (
@@ -452,9 +459,9 @@ if buscar:
                 })
 
 
-                # =================================================
-                # GUARDAR VALORES KM PARA MODIFICAR
-                # =================================================
+                # ---------------------------------------------
+                # GUARDAR KM PARA MODIFICAR
+                # ---------------------------------------------
 
                 if distancia_absoluta < UMBRAL_KM:
 
@@ -464,7 +471,7 @@ if buscar:
 
 
             # =================================================
-            # BÚSQUEDA INDEPENDIENTE EN METROS
+            # 2. BÚSQUEDA INDEPENDIENTE EN METROS
             # =================================================
 
             if (
@@ -494,12 +501,12 @@ if buscar:
 
                 elif (
                     distancia_metros_ind
-                    < UMBRAL_METROS
+                    < UMBRAL_METROS_INDEPENDIENTES
                 ):
 
                     tipo_coincidencia_metros = (
                         f"🟡 CERCANO < "
-                        f"{UMBRAL_METROS:,} m"
+                        f"{UMBRAL_METROS_INDEPENDIENTES:,} m"
                     )
 
                 else:
@@ -537,7 +544,7 @@ if buscar:
                         (
                             "SÍ"
                             if distancia_metros_ind
-                            < UMBRAL_METROS
+                            < UMBRAL_METROS_INDEPENDIENTES
                             else "NO"
                         ),
 
@@ -552,13 +559,23 @@ if buscar:
                 })
 
 
-                direcciones_metros_independientes.append(
-                    direccion
-                )
+                # ---------------------------------------------
+                # SOLO GUARDAMOS PARA MODIFICAR SI CUMPLE
+                # EL TERCER UMBRAL CORRESPONDIENTE
+                # ---------------------------------------------
+
+                if (
+                    distancia_metros_ind
+                    < UMBRAL_METROS_INDEPENDIENTES
+                ):
+
+                    direcciones_metros_independientes.append(
+                        direccion
+                    )
 
 
             # =================================================
-            # BÚSQUEDA POR METROS EQUIVALENTES AL KM
+            # 3. BÚSQUEDA POR METROS EQUIVALENTES AL KM
             # =================================================
 
             if (
@@ -604,7 +621,7 @@ if buscar:
                         (
                             "SÍ"
                             if distancia_absoluta
-                            < UMBRAL_METROS1
+                            < UMBRAL_METROS_EQUIVALENTES
                             else "NO"
                         ),
 
@@ -624,7 +641,10 @@ if buscar:
                 )
 
 
-                if distancia_absoluta < UMBRAL_METROS1:
+                if (
+                    distancia_absoluta
+                    < UMBRAL_METROS_EQUIVALENTES
+                ):
 
                     direcciones_metros_modificar.append(
                         direccion
@@ -659,9 +679,7 @@ if buscar:
 
 
         # ====================================================
-        # ====================================================
         # RESULTADOS DEL BARRIDO KM
-        # ====================================================
         # ====================================================
 
         st.subheader(
@@ -761,7 +779,7 @@ if buscar:
 
 
             # =================================================
-            # VALORES QUE SERÁN MODIFICADOS POR < 100 KM
+            # VALORES QUE SERÁN MODIFICADOS
             # =================================================
 
             cercanos = resultado_barrido[
@@ -833,9 +851,7 @@ if buscar:
 
 
         # ====================================================
-        # ====================================================
         # BÚSQUEDA INDEPENDIENTE EN METROS
-        # ====================================================
         # ====================================================
 
         st.subheader(
@@ -853,6 +869,12 @@ if buscar:
             f"Rango de las tres últimas cifras: "
             f"**{rango_metros_inicio:,} → "
             f"{rango_metros_fin:,} metros**"
+        )
+
+
+        st.info(
+            f"Umbral de modificación independiente: "
+            f"**< {UMBRAL_METROS_INDEPENDIENTES:,} m**"
         )
 
 
@@ -952,14 +974,14 @@ if buscar:
                     resultado_metros_independientes[
                         "Distancia absoluta"
                     ]
-                    < UMBRAL_METROS
+                    < UMBRAL_METROS_INDEPENDIENTES
                 ]
             )
 
 
             st.subheader(
                 f"Valores metros independientes que cumplen "
-                f"< {UMBRAL_METROS:,} m"
+                f"< {UMBRAL_METROS_INDEPENDIENTES:,} m"
             )
 
 
@@ -987,9 +1009,7 @@ if buscar:
 
 
         # ====================================================
-        # ====================================================
         # RESULTADOS METROS EQUIVALENTES AL KM
-        # ====================================================
         # ====================================================
 
         st.subheader(
@@ -1024,7 +1044,7 @@ if buscar:
 
         st.write(
             f"Umbral de modificación: "
-            f"**< {UMBRAL_METROS1:,} metros**"
+            f"**< {UMBRAL_METROS_EQUIVALENTES:,} metros**"
         )
 
 
@@ -1069,13 +1089,13 @@ if buscar:
             metros_a_modificar = resultado_metros[
                 resultado_metros[
                     "Distancia absoluta"
-                ] < UMBRAL_METROS1
+                ] < UMBRAL_METROS_EQUIVALENTES
             ]
 
 
             st.subheader(
                 f"Valores en metros equivalentes al KM que "
-                f"cumplen < {UMBRAL_METROS1:,} m"
+                f"cumplen < {UMBRAL_METROS_EQUIVALENTES:,} m"
             )
 
 
@@ -1125,9 +1145,7 @@ if buscar:
 
 
         # ====================================================
-        # ====================================================
         # MODIFICACIÓN
-        # ====================================================
         # ====================================================
 
         st.subheader(
@@ -1166,8 +1184,14 @@ if buscar:
 
 
         st.write(
-            f"Umbral metros: "
-            f"**< {UMBRAL_METROS1:,} m**"
+            f"Umbral metros independientes: "
+            f"**< {UMBRAL_METROS_INDEPENDIENTES:,} m**"
+        )
+
+
+        st.write(
+            f"Umbral metros equivalentes: "
+            f"**< {UMBRAL_METROS_EQUIVALENTES:,} m**"
         )
 
 
@@ -1181,19 +1205,7 @@ if buscar:
 
 
         cantidad_metros_independientes = len(
-            [
-                d
-                for d in direcciones_metros_independientes
-                if abs(
-                    struct.unpack_from(
-                        "<I",
-                        datos_originales,
-                        d
-                    )[0]
-                    - objetivo_metros_independiente
-                )
-                < UMBRAL_METROS
-            ]
+            direcciones_metros_independientes
         )
 
 
@@ -1362,43 +1374,11 @@ if buscar:
 
 
             # =================================================
-            # MODIFICAR METROS INDEPENDIENTES
+            # GENERAR SUFIJOS METROS INDEPENDIENTES
             # =================================================
 
-            direcciones_metros_ind_modificar = []
-
-
-            for direccion in direcciones_metros_independientes:
-
-                valor_anterior = (
-                    struct.unpack_from(
-                        "<I",
-                        datos_originales,
-                        direccion
-                    )[0]
-                )
-
-
-                diferencia = (
-                    valor_anterior
-                    - objetivo_metros_independiente
-                )
-
-
-                distancia_absoluta = abs(
-                    diferencia
-                )
-
-
-                if distancia_absoluta < UMBRAL_METROS:
-
-                    direcciones_metros_ind_modificar.append(
-                        direccion
-                    )
-
-
             cantidad_ind = len(
-                direcciones_metros_ind_modificar
+                direcciones_metros_independientes
             )
 
 
@@ -1422,8 +1402,12 @@ if buscar:
                 ]
 
 
+            # =================================================
+            # MODIFICAR METROS INDEPENDIENTES
+            # =================================================
+
             for direccion, sufijo in zip(
-                direcciones_metros_ind_modificar,
+                direcciones_metros_independientes,
                 sufijos_independientes
             ):
 
@@ -1534,16 +1518,13 @@ if buscar:
             else:
 
                 sufijos = [
-
                     random.randint(
                         0,
                         999
                     )
-
                     for _ in range(
                         cantidad
                     )
-
                 ]
 
 
@@ -1716,7 +1697,7 @@ if buscar:
             # =================================================
 
             for direccion, sufijo in zip(
-                direcciones_metros_ind_modificar,
+                direcciones_metros_independientes,
                 sufijos_independientes
             ):
 
