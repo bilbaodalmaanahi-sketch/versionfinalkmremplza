@@ -183,7 +183,10 @@ UMBRAL_METROS_INDEPENDIENTES = 100
 
 # 3) Umbral para búsqueda/modificación de METROS
 #    EQUIVALENTES AL KM
-UMBRAL_METROS_EQUIVALENTES = 100_000_000
+#
+# 100.000 metros = 100 km
+#
+UMBRAL_METROS_EQUIVALENTES = 100_000
 
 
 st.info(
@@ -349,7 +352,7 @@ if buscar:
 
 
         # ====================================================
-        # LISTAS
+        # LISTAS DE RESULTADOS
         # ====================================================
 
         resultados_barrido = []
@@ -359,18 +362,33 @@ if buscar:
         resultados_metros = []
 
 
-        # Direcciones KM
+        # ====================================================
+        # DIRECCIONES PARA MODIFICACIÓN
+        # ====================================================
+
         direcciones_km = []
 
-
-        # Direcciones metros independientes
         direcciones_metros_independientes = []
 
-
-        # Direcciones metros equivalentes al KM
-        direcciones_metros = []
-
         direcciones_metros_modificar = []
+
+
+        # ====================================================
+        # CONTROL CENTRAL DE DIRECCIONES
+        #
+        # ESTA ES LA CORRECCIÓN PRINCIPAL.
+        #
+        # Una dirección solo puede ser modificada UNA VEZ.
+        #
+        # Prioridad:
+        #
+        # 1. KM
+        # 2. METROS INDEPENDIENTES
+        # 3. METROS EQUIVALENTES
+        #
+        # ====================================================
+
+        direcciones_usadas = set()
 
 
         # ====================================================
@@ -461,11 +479,20 @@ if buscar:
 
                 # ---------------------------------------------
                 # GUARDAR KM PARA MODIFICAR
+                #
+                # KM TIENE PRIORIDAD MÁXIMA
                 # ---------------------------------------------
 
-                if distancia_absoluta < UMBRAL_KM:
+                if (
+                    distancia_absoluta < UMBRAL_KM
+                    and direccion not in direcciones_usadas
+                ):
 
                     direcciones_km.append(
+                        direccion
+                    )
+
+                    direcciones_usadas.add(
                         direccion
                     )
 
@@ -543,8 +570,10 @@ if buscar:
                     "Modifica":
                         (
                             "SÍ"
-                            if distancia_metros_ind
-                            < UMBRAL_METROS_INDEPENDIENTES
+                            if (
+                                distancia_metros_ind
+                                < UMBRAL_METROS_INDEPENDIENTES
+                            )
                             else "NO"
                         ),
 
@@ -560,16 +589,22 @@ if buscar:
 
 
                 # ---------------------------------------------
-                # SOLO GUARDAMOS PARA MODIFICAR SI CUMPLE
-                # EL TERCER UMBRAL CORRESPONDIENTE
+                # GUARDAR METROS INDEPENDIENTES
+                #
+                # SOLO SI LA DIRECCIÓN NO FUE USADA POR KM
                 # ---------------------------------------------
 
                 if (
                     distancia_metros_ind
                     < UMBRAL_METROS_INDEPENDIENTES
+                    and direccion not in direcciones_usadas
                 ):
 
                     direcciones_metros_independientes.append(
+                        direccion
+                    )
+
+                    direcciones_usadas.add(
                         direccion
                     )
 
@@ -620,8 +655,10 @@ if buscar:
                     "Modifica":
                         (
                             "SÍ"
-                            if distancia_absoluta
-                            < UMBRAL_METROS_EQUIVALENTES
+                            if (
+                                distancia_absoluta
+                                < UMBRAL_METROS_EQUIVALENTES
+                            )
                             else "NO"
                         ),
 
@@ -636,17 +673,25 @@ if buscar:
                 })
 
 
-                direcciones_metros.append(
-                    direccion
-                )
-
+                # ---------------------------------------------
+                # GUARDAR METROS EQUIVALENTES
+                #
+                # SOLO SI LA DIRECCIÓN NO FUE USADA ANTES
+                #
+                # KM > METROS INDEPENDIENTES > METROS EQUIVALENTES
+                # ---------------------------------------------
 
                 if (
                     distancia_absoluta
                     < UMBRAL_METROS_EQUIVALENTES
+                    and direccion not in direcciones_usadas
                 ):
 
                     direcciones_metros_modificar.append(
+                        direccion
+                    )
+
+                    direcciones_usadas.add(
                         direccion
                     )
 
@@ -806,8 +851,8 @@ if buscar:
 
                 st.success(
                     f"Se modificarán "
-                    f"{len(cercanos)} "
-                    f"apariciones KM."
+                    f"{len(direcciones_km)} "
+                    f"apariciones KM únicas."
                 )
 
 
@@ -996,8 +1041,8 @@ if buscar:
 
                 st.success(
                     f"Se encontraron "
-                    f"{len(cercanos_metros_ind)} "
-                    f"valores dentro del umbral."
+                    f"{len(direcciones_metros_independientes)} "
+                    f"valores únicos para modificar."
                 )
 
 
@@ -1084,12 +1129,26 @@ if buscar:
 
             # =================================================
             # VALORES DE METROS QUE SE MODIFICARÁN
+            #
+            # IMPORTANTE:
+            # AQUÍ MOSTRAMOS SOLAMENTE LOS QUE NO FUERON
+            # RESERVADOS POR LAS OTRAS DOS CATEGORÍAS.
             # =================================================
+
+            direcciones_metros_df = set(
+                direcciones_metros_modificar
+            )
+
 
             metros_a_modificar = resultado_metros[
                 resultado_metros[
-                    "Distancia absoluta"
-                ] < UMBRAL_METROS_EQUIVALENTES
+                    "Dirección"
+                ].apply(
+                    lambda x: int(
+                        x,
+                        16
+                    ) in direcciones_metros_df
+                )
             ]
 
 
@@ -1103,15 +1162,16 @@ if buscar:
 
                 st.warning(
                     "No hay valores en metros dentro "
-                    "del umbral de modificación."
+                    "del umbral de modificación que "
+                    "no hayan sido utilizados por otra categoría."
                 )
 
             else:
 
                 st.success(
                     f"Se modificarán "
-                    f"{len(metros_a_modificar)} "
-                    f"apariciones en metros."
+                    f"{len(direcciones_metros_modificar)} "
+                    f"apariciones únicas en metros."
                 )
 
 
@@ -1214,10 +1274,15 @@ if buscar:
         )
 
 
-        total_modificaciones = (
-            cantidad_km
-            + cantidad_metros_independientes
-            + cantidad_metros_equivalentes
+        # ====================================================
+        # TOTAL REAL
+        #
+        # COMO direcciones_usadas ES UN SET,
+        # NUNCA PUEDE CONTENER DUPLICADOS.
+        # ====================================================
+
+        total_modificaciones = len(
+            direcciones_usadas
         )
 
 
@@ -1243,9 +1308,35 @@ if buscar:
 
 
         col4.metric(
-            "Total",
+            "Total ÚNICO",
             total_modificaciones
         )
+
+
+        # ====================================================
+        # CONTROL DE SEGURIDAD
+        # ====================================================
+
+        suma_categorias = (
+            cantidad_km
+            + cantidad_metros_independientes
+            + cantidad_metros_equivalentes
+        )
+
+
+        if suma_categorias != total_modificaciones:
+
+            st.error(
+                "⚠️ ERROR: Se detectó solapamiento "
+                "entre categorías."
+            )
+
+        else:
+
+            st.success(
+                "✓ No existen direcciones duplicadas. "
+                "Cada posición será modificada una sola vez."
+            )
 
 
         # ====================================================
@@ -1625,18 +1716,18 @@ if buscar:
                 })
 
 
-            # =================================================
+            # ====================================================
             # DATAFRAME DE MODIFICACIONES
-            # =================================================
+            # ====================================================
 
             resultado_modificaciones = pd.DataFrame(
                 modificaciones
             )
 
 
-            # =================================================
+            # ====================================================
             # MOSTRAR MODIFICACIONES
-            # =================================================
+            # ====================================================
 
             st.subheader(
                 "📋 Registro de modificaciones"
@@ -1646,7 +1737,7 @@ if buscar:
             st.success(
                 f"Se realizaron "
                 f"{len(modificaciones)} "
-                f"modificaciones."
+                f"modificaciones únicas."
             )
 
 
@@ -1657,9 +1748,9 @@ if buscar:
             )
 
 
-            # =================================================
+            # ====================================================
             # VERIFICACIÓN
-            # =================================================
+            # ====================================================
 
             st.subheader(
                 "✓ Verificación"
@@ -1762,7 +1853,8 @@ if buscar:
 
                 st.success(
                     "✓ Todos los reemplazos fueron "
-                    "verificados correctamente."
+                    "verificados correctamente y "
+                    "no existen modificaciones duplicadas."
                 )
 
             else:
@@ -1774,9 +1866,9 @@ if buscar:
                 )
 
 
-            # =================================================
+            # ====================================================
             # NOMBRE DEL ARCHIVO
-            # =================================================
+            # ====================================================
 
             nombre_original = (
                 archivo.name
@@ -1800,9 +1892,9 @@ if buscar:
                 )
 
 
-            # =================================================
+            # ====================================================
             # DESCARGAR BIN MODIFICADO
-            # =================================================
+            # ====================================================
 
             st.subheader(
                 "⬇️ Descargar BIN modificado"
@@ -1814,30 +1906,4 @@ if buscar:
                 data=bytes(
                     datos_modificados
                 ),
-                file_name=nombre_salida,
-                mime="application/octet-stream",
-                type="primary"
-            )
-
-
-            # =================================================
-            # DESCARGAR CSV
-            # =================================================
-
-            csv_modificaciones = (
-                resultado_modificaciones
-                .to_csv(
-                    index=False
-                )
-                .encode("utf-8")
-            )
-
-
-            st.download_button(
-                label="⬇️ Descargar registro de modificaciones",
-                data=csv_modificaciones,
-                file_name="registro_modificaciones.csv",
-                mime="text/csv"
-            )
-
-
+                file_name=
