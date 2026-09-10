@@ -604,7 +604,7 @@ if buscar:
                         (
                             "SÍ"
                             if distancia_absoluta
-                            < UMBRAL_METROS
+                            < UMBRAL_METROS1
                             else "NO"
                         ),
 
@@ -624,7 +624,7 @@ if buscar:
                 )
 
 
-                if distancia_absoluta < UMBRAL_METROS:
+                if distancia_absoluta < UMBRAL_METROS1:
 
                     direcciones_metros_modificar.append(
                         direccion
@@ -1024,7 +1024,7 @@ if buscar:
 
         st.write(
             f"Umbral de modificación: "
-            f"**< {UMBRAL_METROS:,} metros**"
+            f"**< {UMBRAL_METROS1:,} metros**"
         )
 
 
@@ -1069,13 +1069,13 @@ if buscar:
             metros_a_modificar = resultado_metros[
                 resultado_metros[
                     "Distancia absoluta"
-                ] < UMBRAL_METROS
+                ] < UMBRAL_METROS1
             ]
 
 
             st.subheader(
                 f"Valores en metros equivalentes al KM que "
-                f"cumplen < {UMBRAL_METROS:,} m"
+                f"cumplen < {UMBRAL_METROS1:,} m"
             )
 
 
@@ -1167,7 +1167,7 @@ if buscar:
 
         st.write(
             f"Umbral metros: "
-            f"**< {UMBRAL_METROS:,} m**"
+            f"**< {UMBRAL_METROS1:,} m**"
         )
 
 
