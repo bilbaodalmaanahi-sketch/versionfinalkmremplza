@@ -1,3 +1,122 @@
+import streamlit as st
+import struct
+import pandas as pd
+import random
+
+
+# ============================================================
+# CONFIGURACIÓN
+# ============================================================
+
+st.set_page_config(
+    page_title="Monky BIN Analyzer",
+    page_icon="🐒",
+    layout="wide"
+)
+
+
+# ============================================================
+# ESTILO UNDERGROUND
+# ============================================================
+
+st.markdown("""
+<style>
+
+.stApp {
+    background-color: #080808;
+    color: #00ff66;
+}
+
+html, body, [class*="css"] {
+    font-family: "Courier New", monospace;
+}
+
+h1 {
+    color: #00ff66 !important;
+    font-family: "Courier New", monospace !important;
+    font-weight: bold;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
+
+h2, h3 {
+    color: #00ff66 !important;
+    font-family: "Courier New", monospace !important;
+}
+
+p {
+    color: #b0ffcc;
+}
+
+input {
+    background-color: #111111 !important;
+    color: #00ff66 !important;
+    border: 1px solid #00ff66 !important;
+    font-family: "Courier New", monospace !important;
+}
+
+.stButton > button {
+    background-color: #001a0a;
+    color: #00ff66;
+    border: 1px solid #00ff66;
+    border-radius: 0px;
+    font-family: "Courier New", monospace;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+.stButton > button:hover {
+    background-color: #00ff66;
+    color: #000000;
+}
+
+[data-testid="stMetric"] {
+    background-color: #0d0d0d;
+    border: 1px solid #00ff66;
+    padding: 15px;
+}
+
+[data-testid="stMetricLabel"] {
+    color: #00ff66 !important;
+}
+
+[data-testid="stMetricValue"] {
+    color: #ffffff !important;
+}
+
+[data-testid="stDataFrame"] {
+    border: 1px solid #00ff66;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+# ============================================================
+# TÍTULO
+# ============================================================
+
+st.title("🐒 🌿💨 MONKY BIN ANALYZER")
+
+st.write(
+    "Busca un valor exacto en kilómetros, un valor independiente "
+    "en metros y además analiza los metros equivalentes al "
+    "kilometraje buscado."
+)
+
+st.caption("Concept by Ariel Calacaterra | Developed by DAB")
+
+
+# ============================================================
+# CARGAR ARCHIVO
+# ============================================================
+
+archivo = st.file_uploader(
+    "Seleccionar archivo BIN",
+    type=["bin"]
+)
+
+
 # ============================================================
 # KILOMETRAJE / VALOR EXACTO A BUSCAR
 # ============================================================
@@ -35,3 +154,1709 @@ nuevo_km_input = st.number_input(
     placeholder="Ingrese el nuevo kilometraje",
     step=1
 )
+
+
+# ============================================================
+# MARGEN DE BÚSQUEDA EN METROS
+# ============================================================
+
+MARGEN_BUSQUEDA_METROS = 1_100_000
+
+st.number_input(
+    "Margen de búsqueda en metros",
+    min_value=0,
+    value=MARGEN_BUSQUEDA_METROS,
+    step=100_000,
+    disabled=True
+)
+
+
+# ============================================================
+# UMBRALES INDEPENDIENTES
+# ============================================================
+
+UMBRAL_KM = 100
+UMBRAL_METROS = 100_000
+
+
+st.info(
+    f"Umbral KM: modificación si distancia absoluta < "
+    f"**{UMBRAL_KM:,} km** | "
+    f"Umbral metros: modificación si distancia absoluta < "
+    f"**{UMBRAL_METROS:,} m**"
+)
+
+
+# ============================================================
+# BOTÓN
+# ============================================================
+
+buscar = st.button(
+    "🔎 Buscar y preparar modificación",
+    type="primary"
+)
+
+
+# ============================================================
+# PROCESAMIENTO
+# ============================================================
+
+if buscar:
+
+    # ========================================================
+    # VALIDACIONES
+    # ========================================================
+
+    if archivo is None:
+
+        st.warning(
+            "Primero debes cargar un archivo BIN."
+        )
+
+    elif ingrekk is None:
+
+        st.warning(
+            "Ingrese el kilometraje / valor exacto a buscar."
+        )
+
+    elif busqueda_metros_input is None:
+
+        st.warning(
+            "Ingrese el valor independiente a buscar en metros."
+        )
+
+    elif nuevo_km_input is None:
+
+        st.warning(
+            "Ingrese el nuevo kilometraje fijo."
+        )
+
+    else:
+
+        # ====================================================
+        # LEER BIN
+        # ====================================================
+
+        datos_originales = archivo.read()
+
+        datos_modificados = bytearray(
+            datos_originales
+        )
+
+        tamaño = len(
+            datos_originales
+        )
+
+        objetivo = int(
+            ingrekk
+        )
+
+        objetivo_metros_independiente = int(
+            busqueda_metros_input
+        )
+
+        nuevo_km = int(
+            nuevo_km_input
+        )
+
+
+        # ====================================================
+        # RANGO DE LAS 3 ÚLTIMAS CIFRAS - KM
+        # ====================================================
+
+        rango_inicio = (
+            objetivo // 1000
+        ) * 1000
+
+        rango_fin = (
+            rango_inicio + 999
+        )
+
+
+        # ====================================================
+        # OBJETIVO EN METROS EQUIVALENTE AL KM
+        # ====================================================
+
+        objetivo_metros = (
+            objetivo * 1000
+        )
+
+        limite_inicio = (
+            objetivo_metros
+            - MARGEN_BUSQUEDA_METROS
+        )
+
+        limite_fin = (
+            objetivo_metros
+            + MARGEN_BUSQUEDA_METROS
+        )
+
+
+        # ====================================================
+        # RANGO DE LAS 3 ÚLTIMAS CIFRAS - METROS INDEPENDIENTE
+        # ====================================================
+
+        rango_metros_inicio = (
+            objetivo_metros_independiente // 1000
+        ) * 1000
+
+        rango_metros_fin = (
+            rango_metros_inicio + 999
+        )
+
+
+        # ====================================================
+        # INFORMACIÓN DEL ARCHIVO
+        # ====================================================
+
+        st.success(
+            f"Archivo cargado correctamente: {archivo.name}"
+        )
+
+
+        col1, col2, col3, col4 = st.columns(4)
+
+
+        col1.metric(
+            "Tamaño BIN",
+            f"{tamaño:,} bytes"
+        )
+
+
+        col2.metric(
+            "KM buscado",
+            f"{objetivo:,}"
+        )
+
+
+        col3.metric(
+            "Metros independientes",
+            f"{objetivo_metros_independiente:,}"
+        )
+
+
+        col4.metric(
+            "KM → metros",
+            f"{objetivo_metros:,}"
+        )
+
+
+        # ====================================================
+        # LISTAS
+        # ====================================================
+
+        resultados_barrido = []
+
+        resultados_metros_independientes = []
+
+        resultados_metros = []
+
+
+        # Direcciones KM
+        direcciones_km = []
+
+
+        # Direcciones metros independientes
+        direcciones_metros_independientes = []
+
+
+        # Direcciones metros equivalentes al KM
+        direcciones_metros = []
+
+        direcciones_metros_modificar = []
+
+
+        # ====================================================
+        # BARRIDO COMPLETO DEL BIN
+        # ====================================================
+
+        for direccion in range(
+            0,
+            tamaño - 3
+        ):
+
+            valor = struct.unpack_from(
+                "<I",
+                datos_originales,
+                direccion
+            )[0]
+
+
+            bytes_valor = (
+                datos_originales[
+                    direccion:direccion + 4
+                ]
+            )
+
+
+            # =================================================
+            # BÚSQUEDA DEL RANGO DE KM
+            # =================================================
+
+            if (
+                rango_inicio
+                <= valor
+                <= rango_fin
+            ):
+
+                diferencia = (
+                    valor
+                    - objetivo
+                )
+
+                distancia_absoluta = abs(
+                    diferencia
+                )
+
+
+                if valor == objetivo:
+
+                    tipo_coincidencia = "🔴 EXACTO"
+
+                elif distancia_absoluta < UMBRAL_KM:
+
+                    tipo_coincidencia = (
+                        f"🟡 CERCANO < {UMBRAL_KM} KM"
+                    )
+
+                else:
+
+                    tipo_coincidencia = ""
+
+
+                resultados_barrido.append({
+
+                    "Dirección":
+                        f"0x{direccion:04X}",
+
+                    "Valor":
+                        valor,
+
+                    "Diferencia desde exacto":
+                        diferencia,
+
+                    "Distancia absoluta":
+                        distancia_absoluta,
+
+                    "Coincidencia":
+                        tipo_coincidencia,
+
+                    "HEX":
+                        f"0x{valor:08X}",
+
+                    "Bytes":
+                        bytes_valor.hex(
+                            " "
+                        ).upper()
+
+                })
+
+
+                # =================================================
+                # GUARDAR VALORES KM PARA MODIFICAR
+                # =================================================
+
+                if distancia_absoluta < UMBRAL_KM:
+
+                    direcciones_km.append(
+                        direccion
+                    )
+
+
+            # =================================================
+            # BÚSQUEDA INDEPENDIENTE EN METROS
+            # =================================================
+
+            if (
+                rango_metros_inicio
+                <= valor
+                <= rango_metros_fin
+            ):
+
+                diferencia_metros_ind = (
+                    valor
+                    - objetivo_metros_independiente
+                )
+
+                distancia_metros_ind = abs(
+                    diferencia_metros_ind
+                )
+
+
+                if (
+                    valor
+                    == objetivo_metros_independiente
+                ):
+
+                    tipo_coincidencia_metros = (
+                        "🔴 EXACTO"
+                    )
+
+                elif (
+                    distancia_metros_ind
+                    < UMBRAL_METROS
+                ):
+
+                    tipo_coincidencia_metros = (
+                        f"🟡 CERCANO < "
+                        f"{UMBRAL_METROS:,} m"
+                    )
+
+                else:
+
+                    tipo_coincidencia_metros = ""
+
+
+                resultados_metros_independientes.append({
+
+                    "Dirección":
+                        f"0x{direccion:04X}",
+
+                    "Valor":
+                        valor,
+
+                    "Kilómetros":
+                        round(
+                            valor / 1000,
+                            3
+                        ),
+
+                    "Metros":
+                        valor,
+
+                    "Diferencia (m)":
+                        diferencia_metros_ind,
+
+                    "Distancia absoluta":
+                        distancia_metros_ind,
+
+                    "Coincidencia":
+                        tipo_coincidencia_metros,
+
+                    "Modifica":
+                        (
+                            "SÍ"
+                            if distancia_metros_ind
+                            < UMBRAL_METROS
+                            else "NO"
+                        ),
+
+                    "HEX":
+                        f"0x{valor:08X}",
+
+                    "Bytes":
+                        bytes_valor.hex(
+                            " "
+                        ).upper()
+
+                })
+
+
+                direcciones_metros_independientes.append(
+                    direccion
+                )
+
+
+            # =================================================
+            # BÚSQUEDA POR METROS EQUIVALENTES AL KM
+            # =================================================
+
+            if (
+                limite_inicio
+                <= valor
+                <= limite_fin
+            ):
+
+                diferencia = (
+                    valor
+                    - objetivo_metros
+                )
+
+                distancia_absoluta = abs(
+                    diferencia
+                )
+
+
+                resultados_metros.append({
+
+                    "Dirección":
+                        f"0x{direccion:04X}",
+
+                    "Valor":
+                        valor,
+
+                    "Kilómetros":
+                        round(
+                            valor / 1000,
+                            3
+                        ),
+
+                    "Metros":
+                        valor,
+
+                    "Diferencia (m)":
+                        diferencia,
+
+                    "Distancia absoluta":
+                        distancia_absoluta,
+
+                    "Modifica":
+                        (
+                            "SÍ"
+                            if distancia_absoluta
+                            < UMBRAL_METROS
+                            else "NO"
+                        ),
+
+                    "HEX":
+                        f"0x{valor:08X}",
+
+                    "Bytes":
+                        bytes_valor.hex(
+                            " "
+                        ).upper()
+
+                })
+
+
+                direcciones_metros.append(
+                    direccion
+                )
+
+
+                if distancia_absoluta < UMBRAL_METROS:
+
+                    direcciones_metros_modificar.append(
+                        direccion
+                    )
+
+
+        # ====================================================
+        # DATAFRAME BARRIDO KM
+        # ====================================================
+
+        resultado_barrido = pd.DataFrame(
+            resultados_barrido
+        )
+
+
+        # ====================================================
+        # DATAFRAME METROS INDEPENDIENTES
+        # ====================================================
+
+        resultado_metros_independientes = pd.DataFrame(
+            resultados_metros_independientes
+        )
+
+
+        # ====================================================
+        # DATAFRAME METROS EQUIVALENTES
+        # ====================================================
+
+        resultado_metros = pd.DataFrame(
+            resultados_metros
+        )
+
+
+        # ====================================================
+        # ====================================================
+        # RESULTADOS DEL BARRIDO KM
+        # ====================================================
+        # ====================================================
+
+        st.subheader(
+            "🔎 Barrido de las tres últimas cifras — KM"
+        )
+
+
+        st.write(
+            f"Se buscaron todos los valores desde "
+            f"**{rango_inicio:,}** hasta "
+            f"**{rango_fin:,}**."
+        )
+
+
+        st.info(
+            f"Se modificarán los valores cuya distancia "
+            f"absoluta respecto de **{objetivo:,} km** sea "
+            f"**menor a {UMBRAL_KM:,} km**."
+        )
+
+
+        if resultado_barrido.empty:
+
+            st.warning(
+                f"No se encontraron valores entre "
+                f"{rango_inicio:,} y "
+                f"{rango_fin:,}."
+            )
+
+        else:
+
+            resultado_barrido = (
+                resultado_barrido
+                .sort_values(
+                    [
+                        "Valor",
+                        "Dirección"
+                    ]
+                )
+                .reset_index(
+                    drop=True
+                )
+            )
+
+
+            st.success(
+                f"Se encontraron "
+                f"{len(resultado_barrido)} "
+                f"coincidencias."
+            )
+
+
+            st.dataframe(
+                resultado_barrido,
+                use_container_width=True,
+                hide_index=True
+            )
+
+
+            # =================================================
+            # VALORES EXACTOS
+            # =================================================
+
+            exactos = resultado_barrido[
+                resultado_barrido[
+                    "Valor"
+                ] == objetivo
+            ]
+
+
+            st.subheader(
+                f"Valor exacto: {objetivo:,}"
+            )
+
+
+            if exactos.empty:
+
+                st.warning(
+                    f"No se encontró el valor exacto "
+                    f"{objetivo:,}."
+                )
+
+            else:
+
+                st.success(
+                    f"Se encontraron "
+                    f"{len(exactos)} "
+                    f"apariciones exactas."
+                )
+
+
+                st.dataframe(
+                    exactos,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+
+            # =================================================
+            # VALORES QUE SERÁN MODIFICADOS POR < 100 KM
+            # =================================================
+
+            cercanos = resultado_barrido[
+                resultado_barrido[
+                    "Distancia absoluta"
+                ] < UMBRAL_KM
+            ]
+
+
+            st.subheader(
+                f"Valores KM que cumplen < "
+                f"{UMBRAL_KM:,} km"
+            )
+
+
+            if cercanos.empty:
+
+                st.warning(
+                    "No hay valores KM dentro del "
+                    "umbral de modificación."
+                )
+
+            else:
+
+                st.success(
+                    f"Se modificarán "
+                    f"{len(cercanos)} "
+                    f"apariciones KM."
+                )
+
+
+                st.dataframe(
+                    cercanos,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+
+            # =================================================
+            # RESUMEN
+            # =================================================
+
+            st.subheader(
+                "Resumen del barrido KM"
+            )
+
+
+            resumen = (
+                resultado_barrido[
+                    "Valor"
+                ]
+                .value_counts()
+                .sort_index()
+                .reset_index()
+            )
+
+
+            resumen.columns = [
+                "Valor",
+                "Cantidad de apariciones"
+            ]
+
+
+            st.dataframe(
+                resumen,
+                use_container_width=True,
+                hide_index=True
+            )
+
+
+        # ====================================================
+        # ====================================================
+        # BÚSQUEDA INDEPENDIENTE EN METROS
+        # ====================================================
+        # ====================================================
+
+        st.subheader(
+            "📏 Barrido independiente de las tres últimas cifras — METROS"
+        )
+
+
+        st.write(
+            f"Valor independiente buscado: "
+            f"**{objetivo_metros_independiente:,} metros**"
+        )
+
+
+        st.write(
+            f"Rango de las tres últimas cifras: "
+            f"**{rango_metros_inicio:,} → "
+            f"{rango_metros_fin:,} metros**"
+        )
+
+
+        st.info(
+            f"Este valor es independiente del kilometraje "
+            f"**{objetivo:,} km**."
+        )
+
+
+        if resultado_metros_independientes.empty:
+
+            st.warning(
+                f"No se encontraron valores entre "
+                f"{rango_metros_inicio:,} y "
+                f"{rango_metros_fin:,} metros."
+            )
+
+        else:
+
+            resultado_metros_independientes = (
+                resultado_metros_independientes
+                .sort_values(
+                    [
+                        "Valor",
+                        "Dirección"
+                    ]
+                )
+                .reset_index(
+                    drop=True
+                )
+            )
+
+
+            st.success(
+                f"Se encontraron "
+                f"{len(resultado_metros_independientes)} "
+                f"coincidencias."
+            )
+
+
+            st.dataframe(
+                resultado_metros_independientes,
+                use_container_width=True,
+                hide_index=True
+            )
+
+
+            # =================================================
+            # EXACTO METROS INDEPENDIENTE
+            # =================================================
+
+            exactos_metros_ind = (
+                resultado_metros_independientes[
+                    resultado_metros_independientes[
+                        "Valor"
+                    ]
+                    == objetivo_metros_independiente
+                ]
+            )
+
+
+            st.subheader(
+                f"Valor exacto en metros: "
+                f"{objetivo_metros_independiente:,}"
+            )
+
+
+            if exactos_metros_ind.empty:
+
+                st.warning(
+                    f"No se encontró el valor exacto "
+                    f"{objetivo_metros_independiente:,} m."
+                )
+
+            else:
+
+                st.success(
+                    f"Se encontraron "
+                    f"{len(exactos_metros_ind)} "
+                    f"apariciones exactas."
+                )
+
+
+                st.dataframe(
+                    exactos_metros_ind,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+
+            # =================================================
+            # CERCANOS METROS INDEPENDIENTES
+            # =================================================
+
+            cercanos_metros_ind = (
+                resultado_metros_independientes[
+                    resultado_metros_independientes[
+                        "Distancia absoluta"
+                    ]
+                    < UMBRAL_METROS
+                ]
+            )
+
+
+            st.subheader(
+                f"Valores metros independientes que cumplen "
+                f"< {UMBRAL_METROS:,} m"
+            )
+
+
+            if cercanos_metros_ind.empty:
+
+                st.warning(
+                    "No hay valores dentro del "
+                    "umbral de modificación."
+                )
+
+            else:
+
+                st.success(
+                    f"Se encontraron "
+                    f"{len(cercanos_metros_ind)} "
+                    f"valores dentro del umbral."
+                )
+
+
+                st.dataframe(
+                    cercanos_metros_ind,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+
+        # ====================================================
+        # ====================================================
+        # RESULTADOS METROS EQUIVALENTES AL KM
+        # ====================================================
+        # ====================================================
+
+        st.subheader(
+            "📐 Análisis de metros equivalentes al KM buscado"
+        )
+
+
+        st.write(
+            f"Kilometraje buscado: "
+            f"**{objetivo:,} km**"
+        )
+
+
+        st.write(
+            f"Equivalente: "
+            f"**{objetivo_metros:,} metros**"
+        )
+
+
+        st.write(
+            f"Margen de búsqueda: "
+            f"**±{MARGEN_BUSQUEDA_METROS:,} metros**"
+        )
+
+
+        st.write(
+            f"Rango de búsqueda: "
+            f"**{limite_inicio:,} → "
+            f"{limite_fin:,} metros**"
+        )
+
+
+        st.write(
+            f"Umbral de modificación: "
+            f"**< {UMBRAL_METROS:,} metros**"
+        )
+
+
+        if resultado_metros.empty:
+
+            st.warning(
+                "No se encontraron valores dentro "
+                "del margen de búsqueda."
+            )
+
+        else:
+
+            resultado_metros = (
+                resultado_metros
+                .sort_values(
+                    "Distancia absoluta"
+                )
+                .reset_index(
+                    drop=True
+                )
+            )
+
+
+            st.success(
+                f"Se encontraron "
+                f"{len(resultado_metros)} "
+                f"coincidencias dentro del margen."
+            )
+
+
+            st.dataframe(
+                resultado_metros,
+                use_container_width=True,
+                hide_index=True
+            )
+
+
+            # =================================================
+            # VALORES DE METROS QUE SE MODIFICARÁN
+            # =================================================
+
+            metros_a_modificar = resultado_metros[
+                resultado_metros[
+                    "Distancia absoluta"
+                ] < UMBRAL_METROS
+            ]
+
+
+            st.subheader(
+                f"Valores en metros equivalentes al KM que "
+                f"cumplen < {UMBRAL_METROS:,} m"
+            )
+
+
+            if metros_a_modificar.empty:
+
+                st.warning(
+                    "No hay valores en metros dentro "
+                    "del umbral de modificación."
+                )
+
+            else:
+
+                st.success(
+                    f"Se modificarán "
+                    f"{len(metros_a_modificar)} "
+                    f"apariciones en metros."
+                )
+
+
+                st.dataframe(
+                    metros_a_modificar,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+
+            # =================================================
+            # VALOR MÁS CERCANO
+            # =================================================
+
+            cercano = (
+                resultado_metros.iloc[0]
+            )
+
+
+            st.info(
+                f"Más cercano al equivalente: "
+                f"{cercano['Metros']:,} metros | "
+                f"{cercano['Kilómetros']} km | "
+                f"Diferencia: "
+                f"{cercano['Diferencia (m)']:+,} m | "
+                f"Distancia absoluta: "
+                f"{cercano['Distancia absoluta']:,} m | "
+                f"Dirección: "
+                f"{cercano['Dirección']}"
+            )
+
+
+        # ====================================================
+        # ====================================================
+        # MODIFICACIÓN
+        # ====================================================
+        # ====================================================
+
+        st.subheader(
+            "🛠️ Modificación de valores"
+        )
+
+
+        st.write(
+            f"Valor original exacto KM: "
+            f"**{objetivo:,} km**"
+        )
+
+
+        st.write(
+            f"Valor independiente en metros: "
+            f"**{objetivo_metros_independiente:,} m**"
+        )
+
+
+        st.write(
+            f"Nuevo kilometraje: "
+            f"**{nuevo_km:,} km**"
+        )
+
+
+        st.write(
+            f"Nuevo valor base en metros: "
+            f"**{nuevo_km * 1000:,} m**"
+        )
+
+
+        st.write(
+            f"Umbral KM: "
+            f"**< {UMBRAL_KM:,} km**"
+        )
+
+
+        st.write(
+            f"Umbral metros: "
+            f"**< {UMBRAL_METROS:,} m**"
+        )
+
+
+        # ====================================================
+        # CANTIDADES
+        # ====================================================
+
+        cantidad_km = len(
+            direcciones_km
+        )
+
+
+        cantidad_metros_independientes = len(
+            [
+                d
+                for d in direcciones_metros_independientes
+                if abs(
+                    struct.unpack_from(
+                        "<I",
+                        datos_originales,
+                        d
+                    )[0]
+                    - objetivo_metros_independiente
+                )
+                < UMBRAL_METROS
+            ]
+        )
+
+
+        cantidad_metros_equivalentes = len(
+            direcciones_metros_modificar
+        )
+
+
+        total_modificaciones = (
+            cantidad_km
+            + cantidad_metros_independientes
+            + cantidad_metros_equivalentes
+        )
+
+
+        col1, col2, col3, col4 = st.columns(4)
+
+
+        col1.metric(
+            "KM a modificar",
+            cantidad_km
+        )
+
+
+        col2.metric(
+            "Metros independientes",
+            cantidad_metros_independientes
+        )
+
+
+        col3.metric(
+            "Metros equivalentes",
+            cantidad_metros_equivalentes
+        )
+
+
+        col4.metric(
+            "Total",
+            total_modificaciones
+        )
+
+
+        # ====================================================
+        # REALIZAR MODIFICACIONES
+        # ====================================================
+
+        if total_modificaciones == 0:
+
+            st.warning(
+                "No se encontraron valores "
+                "para modificar."
+            )
+
+
+        else:
+
+            modificaciones = []
+
+
+            # =================================================
+            # MODIFICAR VALORES KM
+            # =================================================
+
+            for direccion in direcciones_km:
+
+                valor_anterior = (
+                    struct.unpack_from(
+                        "<I",
+                        datos_originales,
+                        direccion
+                    )[0]
+                )
+
+
+                diferencia = (
+                    valor_anterior
+                    - objetivo
+                )
+
+
+                distancia_absoluta = abs(
+                    diferencia
+                )
+
+
+                if valor_anterior == objetivo:
+
+                    tipo_modificacion = "KM exacto"
+
+                elif valor_anterior < objetivo:
+
+                    tipo_modificacion = (
+                        f"KM cercano por debajo "
+                        f"(< {UMBRAL_KM} km)"
+                    )
+
+                else:
+
+                    tipo_modificacion = (
+                        f"KM cercano por encima "
+                        f"(< {UMBRAL_KM} km)"
+                    )
+
+
+                nuevo_valor = nuevo_km
+
+
+                nuevos_bytes = struct.pack(
+                    "<I",
+                    nuevo_valor
+                )
+
+
+                datos_modificados[
+                    direccion:
+                    direccion + 4
+                ] = nuevos_bytes
+
+
+                modificaciones.append({
+
+                    "Tipo":
+                        tipo_modificacion,
+
+                    "Dirección":
+                        f"0x{direccion:04X}",
+
+                    "Valor anterior":
+                        valor_anterior,
+
+                    "Diferencia":
+                        diferencia,
+
+                    "Distancia absoluta":
+                        distancia_absoluta,
+
+                    "Nuevo valor":
+                        nuevo_valor,
+
+                    "Kilómetros":
+                        nuevo_valor,
+
+                    "Últimas 3 cifras":
+                        "",
+
+                    "HEX anterior":
+                        f"0x{valor_anterior:08X}",
+
+                    "HEX nuevo":
+                        f"0x{nuevo_valor:08X}",
+
+                    "Bytes anteriores":
+                        datos_originales[
+                            direccion:
+                            direccion + 4
+                        ].hex(
+                            " "
+                        ).upper(),
+
+                    "Bytes nuevos":
+                        nuevos_bytes.hex(
+                            " "
+                        ).upper()
+
+                })
+
+
+            # =================================================
+            # MODIFICAR METROS INDEPENDIENTES
+            # =================================================
+
+            direcciones_metros_ind_modificar = []
+
+
+            for direccion in direcciones_metros_independientes:
+
+                valor_anterior = (
+                    struct.unpack_from(
+                        "<I",
+                        datos_originales,
+                        direccion
+                    )[0]
+                )
+
+
+                diferencia = (
+                    valor_anterior
+                    - objetivo_metros_independiente
+                )
+
+
+                distancia_absoluta = abs(
+                    diferencia
+                )
+
+
+                if distancia_absoluta < UMBRAL_METROS:
+
+                    direcciones_metros_ind_modificar.append(
+                        direccion
+                    )
+
+
+            cantidad_ind = len(
+                direcciones_metros_ind_modificar
+            )
+
+
+            if cantidad_ind <= 1000:
+
+                sufijos_independientes = random.sample(
+                    range(1000),
+                    cantidad_ind
+                )
+
+            else:
+
+                sufijos_independientes = [
+                    random.randint(
+                        0,
+                        999
+                    )
+                    for _ in range(
+                        cantidad_ind
+                    )
+                ]
+
+
+            for direccion, sufijo in zip(
+                direcciones_metros_ind_modificar,
+                sufijos_independientes
+            ):
+
+                valor_anterior = (
+                    struct.unpack_from(
+                        "<I",
+                        datos_originales,
+                        direccion
+                    )[0]
+                )
+
+
+                diferencia = (
+                    valor_anterior
+                    - objetivo_metros_independiente
+                )
+
+
+                distancia_absoluta = abs(
+                    diferencia
+                )
+
+
+                nuevo_valor = (
+                    nuevo_km * 1000
+                ) + sufijo
+
+
+                nuevos_bytes = struct.pack(
+                    "<I",
+                    nuevo_valor
+                )
+
+
+                datos_modificados[
+                    direccion:
+                    direccion + 4
+                ] = nuevos_bytes
+
+
+                modificaciones.append({
+
+                    "Tipo":
+                        "Metros independientes",
+
+                    "Dirección":
+                        f"0x{direccion:04X}",
+
+                    "Valor anterior":
+                        valor_anterior,
+
+                    "Diferencia":
+                        diferencia,
+
+                    "Distancia absoluta":
+                        distancia_absoluta,
+
+                    "Nuevo valor":
+                        nuevo_valor,
+
+                    "Kilómetros":
+                        round(
+                            nuevo_valor / 1000,
+                            3
+                        ),
+
+                    "Últimas 3 cifras":
+                        f"{sufijo:03d}",
+
+                    "HEX anterior":
+                        f"0x{valor_anterior:08X}",
+
+                    "HEX nuevo":
+                        f"0x{nuevo_valor:08X}",
+
+                    "Bytes anteriores":
+                        datos_originales[
+                            direccion:
+                            direccion + 4
+                        ].hex(
+                            " "
+                        ).upper(),
+
+                    "Bytes nuevos":
+                        nuevos_bytes.hex(
+                            " "
+                        ).upper()
+
+                })
+
+
+            # =================================================
+            # GENERAR SUFIJOS METROS EQUIVALENTES
+            # =================================================
+
+            cantidad = len(
+                direcciones_metros_modificar
+            )
+
+
+            if cantidad <= 1000:
+
+                sufijos = random.sample(
+                    range(1000),
+                    cantidad
+                )
+
+            else:
+
+                sufijos = [
+
+                    random.randint(
+                        0,
+                        999
+                    )
+
+                    for _ in range(
+                        cantidad
+                    )
+
+                ]
+
+
+            # =================================================
+            # MODIFICAR METROS EQUIVALENTES AL KM
+            # =================================================
+
+            for direccion, sufijo in zip(
+                direcciones_metros_modificar,
+                sufijos
+            ):
+
+                valor_anterior = (
+                    struct.unpack_from(
+                        "<I",
+                        datos_originales,
+                        direccion
+                    )[0]
+                )
+
+
+                diferencia = (
+                    valor_anterior
+                    - objetivo_metros
+                )
+
+
+                distancia_absoluta = abs(
+                    diferencia
+                )
+
+
+                nuevo_valor = (
+                    nuevo_km * 1000
+                ) + sufijo
+
+
+                nuevos_bytes = struct.pack(
+                    "<I",
+                    nuevo_valor
+                )
+
+
+                datos_modificados[
+                    direccion:
+                    direccion + 4
+                ] = nuevos_bytes
+
+
+                modificaciones.append({
+
+                    "Tipo":
+                        "Metros equivalentes al KM",
+
+                    "Dirección":
+                        f"0x{direccion:04X}",
+
+                    "Valor anterior":
+                        valor_anterior,
+
+                    "Diferencia":
+                        diferencia,
+
+                    "Distancia absoluta":
+                        distancia_absoluta,
+
+                    "Nuevo valor":
+                        nuevo_valor,
+
+                    "Kilómetros":
+                        round(
+                            nuevo_valor / 1000,
+                            3
+                        ),
+
+                    "Últimas 3 cifras":
+                        f"{sufijo:03d}",
+
+                    "HEX anterior":
+                        f"0x{valor_anterior:08X}",
+
+                    "HEX nuevo":
+                        f"0x{nuevo_valor:08X}",
+
+                    "Bytes anteriores":
+                        datos_originales[
+                            direccion:
+                            direccion + 4
+                        ].hex(
+                            " "
+                        ).upper(),
+
+                    "Bytes nuevos":
+                        nuevos_bytes.hex(
+                            " "
+                        ).upper()
+
+                })
+
+
+            # =================================================
+            # DATAFRAME DE MODIFICACIONES
+            # =================================================
+
+            resultado_modificaciones = pd.DataFrame(
+                modificaciones
+            )
+
+
+            # =================================================
+            # MOSTRAR MODIFICACIONES
+            # =================================================
+
+            st.subheader(
+                "📋 Registro de modificaciones"
+            )
+
+
+            st.success(
+                f"Se realizaron "
+                f"{len(modificaciones)} "
+                f"modificaciones."
+            )
+
+
+            st.dataframe(
+                resultado_modificaciones,
+                use_container_width=True,
+                hide_index=True
+            )
+
+
+            # =================================================
+            # VERIFICACIÓN
+            # =================================================
+
+            st.subheader(
+                "✓ Verificación"
+            )
+
+
+            errores = 0
+
+
+            # =================================================
+            # VERIFICAR KM
+            # =================================================
+
+            for direccion in direcciones_km:
+
+                valor_verificado = (
+                    struct.unpack_from(
+                        "<I",
+                        datos_modificados,
+                        direccion
+                    )[0]
+                )
+
+
+                if (
+                    valor_verificado
+                    != nuevo_km
+                ):
+
+                    errores += 1
+
+
+            # =================================================
+            # VERIFICAR METROS INDEPENDIENTES
+            # =================================================
+
+            for direccion, sufijo in zip(
+                direcciones_metros_ind_modificar,
+                sufijos_independientes
+            ):
+
+                valor_esperado = (
+                    nuevo_km * 1000
+                ) + sufijo
+
+
+                valor_verificado = (
+                    struct.unpack_from(
+                        "<I",
+                        datos_modificados,
+                        direccion
+                    )[0]
+                )
+
+
+                if (
+                    valor_verificado
+                    != valor_esperado
+                ):
+
+                    errores += 1
+
+
+            # =================================================
+            # VERIFICAR METROS EQUIVALENTES
+            # =================================================
+
+            for direccion, sufijo in zip(
+                direcciones_metros_modificar,
+                sufijos
+            ):
+
+                valor_esperado = (
+                    nuevo_km * 1000
+                ) + sufijo
+
+
+                valor_verificado = (
+                    struct.unpack_from(
+                        "<I",
+                        datos_modificados,
+                        direccion
+                    )[0]
+                )
+
+
+                if (
+                    valor_verificado
+                    != valor_esperado
+                ):
+
+                    errores += 1
+
+
+            # =================================================
+            # RESULTADO DE VERIFICACIÓN
+            # =================================================
+
+            if errores == 0:
+
+                st.success(
+                    "✓ Todos los reemplazos fueron "
+                    "verificados correctamente."
+                )
+
+            else:
+
+                st.error(
+                    f"Se detectaron "
+                    f"{errores} errores "
+                    f"durante la verificación."
+                )
+
+
+            # =================================================
+            # NOMBRE DEL ARCHIVO
+            # =================================================
+
+            nombre_original = (
+                archivo.name
+            )
+
+
+            if nombre_original.lower().endswith(
+                ".bin"
+            ):
+
+                nombre_salida = (
+                    nombre_original[:-4]
+                    + "_MODIFICADO.bin"
+                )
+
+            else:
+
+                nombre_salida = (
+                    nombre_original
+                    + "_MODIFICADO.bin"
+                )
+
+
+            # =================================================
+            # DESCARGAR BIN MODIFICADO
+            # =================================================
+
+            st.subheader(
+                "⬇️ Descargar BIN modificado"
+            )
+
+
+            st.download_button(
+                label="⬇️ Descargar BIN MODIFICADO",
+                data=bytes(
+                    datos_modificados
+                ),
+                file_name=nombre_salida,
+                mime="application/octet-stream",
+                type="primary"
+            )
+
+
+            # =================================================
+            # DESCARGAR CSV
+            # =================================================
+
+            csv_modificaciones = (
+                resultado_modificaciones
+                .to_csv(
+                    index=False
+                )
+                .encode("utf-8")
+            )
+
+
+            st.download_button(
+                label="⬇️ Descargar registro de modificaciones",
+                data=csv_modificaciones,
+                file_name="registro_modificaciones.csv",
+                mime="text/csv"
+            )
+
+
