@@ -177,7 +177,7 @@ st.number_input(
 
 UMBRAL_KM = 100
 UMBRAL_METROS = 100_000
-
+UMBRAL_METROS = 100_000_000
 
 st.info(
     f"Umbral KM: modificación si distancia absoluta < "
